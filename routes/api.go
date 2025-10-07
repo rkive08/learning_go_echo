@@ -12,8 +12,8 @@ func RegisterRoutes(e *echo.Echo) {
 	// auth
 	e.POST("/api/login", controllers.Login)
 	e.POST("/api/register", controllers.Register)
-	// e.POST("/api/forgot-password", controllers.ForgotPassword)
-	// e.POST("/api/reset-password", controllers.ResetPassword)
+	e.POST("/api/forgot-password", controllers.ForgotPassword)
+	e.POST("/api/reset-password", controllers.ResetPassword)
 
 	// route yang butuh token
 	r := e.Group("/api")

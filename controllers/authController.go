@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -134,4 +137,109 @@ func Register(c echo.Context) error {
 		"success": true,
 	})
 
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// generate random token
+func generateToken(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func ForgotPassword(c echo.Context) error {
+	fmt.Println(">>> ForgotPassword endpoint called")
+	req := new(ForgotPasswordRequest)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	// cek apakah user ada
+	var user models.User
+	if err := config.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "Email tidak ditemukan"})
+	}
+
+	// generate token
+	token, err := generateToken(32)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Gagal generate token"})
+	}
+
+	// simpan token ke DB
+	reset := models.PasswordReset{
+		Email:     req.Email,
+		Token:     token,
+		CreatedAt: time.Now(),
+	}
+	config.DB.Create(&reset)
+
+	// buat reset link
+	resetLink := "http://localhost:3000/reset-password?token=" + token
+
+	// kirim email pakai template
+	subject := "Reset Password"
+	data := map[string]string{
+		"ResetLink": resetLink,
+	}
+
+	err = config.SendEmailTemplate(user.Email, subject, "templates/reset_password.html", data)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Gagal mengirim email"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"message": "Email reset password sudah dikirim",
+	})
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=6"`
+}
+
+func ResetPassword(c echo.Context) error {
+	req := new(ResetPasswordRequest)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	// cari token di tabel password_resets
+	var reset models.PasswordReset
+	if err := config.DB.Where("token = ?", req.Token).First(&reset).Error; err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Token tidak valid"})
+	}
+
+	// cek apakah token expired (misalnya berlaku 1 jam)
+	if time.Since(reset.CreatedAt) > time.Hour {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Token sudah expired"})
+	}
+
+	// cari user berdasarkan email
+	var user models.User
+	if err := config.DB.Where("email = ?", reset.Email).First(&user).Error; err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "User tidak ditemukan"})
+	}
+
+	// hash password baru
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Gagal hash password"})
+	}
+
+	// update password user
+	user.Password = string(hashed)
+	config.DB.Save(&user)
+
+	// hapus token biar tidak bisa dipakai ulang
+	config.DB.Delete(&reset)
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"message": "Password berhasil direset, silakan login kembali",
+	})
 }
