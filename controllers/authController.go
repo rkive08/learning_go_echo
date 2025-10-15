@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"belajar_go_echo/config"
@@ -180,7 +181,7 @@ func ForgotPassword(c echo.Context) error {
 	config.DB.Create(&reset)
 
 	// buat reset link
-	resetLink := "http://localhost:3000/reset-password?token=" + token
+	resetLink := os.Getenv("APP_FRONTEND_URL") + "/reset-password?token=" + token
 
 	// kirim email pakai template
 	subject := "Reset Password"
@@ -243,3 +244,24 @@ func ResetPassword(c echo.Context) error {
 		"message": "Password berhasil direset, silakan login kembali",
 	})
 }
+
+// func GetProfile(c echo.Context) error {
+// 	// Ambil data token JWT dari context
+// 	userToken := c.Get("user").(*jwt.Token)
+// 	claims := userToken.Claims.(*JwtCustomClaims)
+
+// 	// Ambil user ID dari claims
+// 	var user models.User
+// 	if err := config.DB.First(&user, claims.UserID).Error; err != nil {
+// 		return c.JSON(http.StatusNotFound, echo.Map{
+// 			"error": "User not found",
+// 		})
+// 	}
+
+// 	// Kirim response tanpa password
+// 	return c.JSON(http.StatusOK, echo.Map{
+// 		"id":    user.ID,
+// 		"name":  user.Name,
+// 		"email": user.Email,
+// 	})
+// }

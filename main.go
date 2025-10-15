@@ -59,8 +59,13 @@ func main() {
 	e := echo.New()
 
 	// ✅ Tambahkan middleware CORS di sini
+	allowedOrigin := os.Getenv("APP_FRONTEND_URL")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:3000"
+	}
+
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:3000"}, // asal Nuxt kamu
+		AllowOrigins:     []string{allowedOrigin, "http://localhost:3000"},
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true,
