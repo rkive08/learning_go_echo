@@ -25,6 +25,7 @@ func RegisterRoutes(e *echo.Echo) {
 	}))
 
 	r.GET("/restricted", controllers.Restricted)
+	r.GET("/profile", controllers.GetProfile)
 
 	// 	// category
 	r.GET("/category-products", controllers.GetCategories)
